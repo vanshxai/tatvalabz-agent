@@ -85,6 +85,16 @@ function safeExec(cmd) {
 }
 
 function listSerialPorts() {
+  if (process.platform === 'darwin') {
+    try {
+      const entries = fs.readdirSync('/dev');
+      return entries
+        .filter((name) => name.startsWith('tty.') || name.startsWith('cu.'))
+        .map((name) => `/dev/${name}`);
+    } catch {
+      return [];
+    }
+  }
   if (process.platform !== 'linux') return [];
   try {
     return fs.readdirSync('/dev')
@@ -101,6 +111,32 @@ function listSerialPorts() {
 }
 
 function listUsbDevices() {
+  if (process.platform === 'darwin') {
+    const output = safeExec('system_profiler SPUSBDataType -json');
+    if (!output) return [];
+    try {
+      const payload = JSON.parse(output);
+      const items = payload?.SPUSBDataType || [];
+      const results = [];
+      const walk = (nodes) => {
+        if (!Array.isArray(nodes)) return;
+        nodes.forEach((node) => {
+          const name = node?._name || node?.name;
+          const vendor = node?.manufacturer || node?.vendor_name || '';
+          const product = node?.product_id || '';
+          if (name) {
+            const line = [name, vendor, product].filter(Boolean).join(' · ');
+            results.push(line);
+          }
+          if (Array.isArray(node?._items)) walk(node._items);
+        });
+      };
+      walk(items);
+      return results;
+    } catch {
+      return [];
+    }
+  }
   const output = safeExec('lsusb');
   if (!output) return [];
   return output.split('\n').filter(Boolean);
