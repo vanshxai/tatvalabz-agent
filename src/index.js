@@ -31,7 +31,12 @@ heartbeat.start();
 controlChannel.start();
 
 function safeJson(res, status, payload) {
-  res.writeHead(status, { 'content-type': 'application/json; charset=utf-8' });
+  res.writeHead(status, {
+    'content-type': 'application/json; charset=utf-8',
+    'access-control-allow-origin': process.env.AGENT_CORS_ORIGIN || '*',
+    'access-control-allow-headers': 'content-type',
+    'access-control-allow-methods': 'GET,POST,OPTIONS',
+  });
   res.end(JSON.stringify(payload));
 }
 
@@ -175,6 +180,14 @@ function getDeviceSnapshot() {
 const server = http.createServer(async (req, res) => {
   try {
     const url = new URL(req.url, `http://${req.headers.host || `${HOST}:${PORT}`}`);
+    if (req.method === 'OPTIONS') {
+      res.writeHead(204, {
+        'access-control-allow-origin': process.env.AGENT_CORS_ORIGIN || '*',
+        'access-control-allow-headers': 'content-type',
+        'access-control-allow-methods': 'GET,POST,OPTIONS',
+      });
+      return res.end();
+    }
 
     if (req.method === 'GET' && url.pathname === '/health') {
       return safeJson(res, 200, getStatus());
