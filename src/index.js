@@ -123,21 +123,62 @@ function listUsbDevices() {
       const payload = JSON.parse(output);
       const items = payload?.SPUSBDataType || [];
       const results = [];
-      const walk = (nodes) => {
+      const flatDevices = [];
+      const internalDevices = [];
+      const externalDevices = [];
+      const controllers = [];
+      const walk = (nodes, container) => {
         if (!Array.isArray(nodes)) return;
         nodes.forEach((node) => {
-          const name = node?._name || node?.name;
+          const name = node?._name || node?.name || '';
           const vendor = node?.manufacturer || node?.vendor_name || '';
           const product = node?.product_id || '';
+          const serial = node?.serial_num || '';
+          const location = node?.location_id || '';
+          const speed = node?.speed || '';
+          const builtIn = String(node?.built_in || '').toLowerCase() === 'yes';
+          const isInternal = builtIn || vendor.toLowerCase().includes('apple');
+          const entry = {
+            name,
+            vendor,
+            product,
+            serial,
+            location,
+            speed,
+            internal: isInternal,
+          };
           if (name) {
             const line = [name, vendor, product].filter(Boolean).join(' · ');
             results.push(line);
+            flatDevices.push(entry);
+            if (isInternal) internalDevices.push(entry);
+            else externalDevices.push(entry);
           }
-          if (Array.isArray(node?._items)) walk(node._items);
+          const children = node?._items;
+          if (Array.isArray(children)) {
+            const containerNode = {
+              name,
+              vendor,
+              product,
+              serial,
+              location,
+              speed,
+              internal: isInternal,
+              devices: [],
+            };
+            if (container) container.devices.push(containerNode);
+            else if (name) controllers.push(containerNode);
+            walk(children, containerNode);
+          }
         });
       };
-      walk(items);
-      return results;
+      walk(items, null);
+      return {
+        flat: results,
+        controllers,
+        internal: internalDevices,
+        external: externalDevices,
+      };
     } catch {
       return [];
     }
@@ -165,6 +206,8 @@ function listNetworkInterfaces() {
 }
 
 function getDeviceSnapshot() {
+  const usbDetails = listUsbDevices();
+  const usbFlat = Array.isArray(usbDetails) ? usbDetails : (usbDetails?.flat || []);
   return {
     ok: true,
     ts: new Date().toISOString(),
@@ -172,7 +215,8 @@ function getDeviceSnapshot() {
     arch: process.arch,
     hostname: os.hostname(),
     serial: listSerialPorts(),
-    usb: listUsbDevices(),
+    usb: usbFlat,
+    usbDetails: Array.isArray(usbDetails) ? null : usbDetails,
     network: listNetworkInterfaces(),
   };
 }
