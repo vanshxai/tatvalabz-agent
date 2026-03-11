@@ -246,8 +246,43 @@ function listWifiDetails() {
     }
   }
 
-  // Fallback: networksetup (SSID only)
-  const nsOut = safeExec('networksetup -getairportnetwork en0');
+  // Fallback: wdutil info (newer macOS)
+  const wdOut = safeExec('wdutil info');
+  if (wdOut) {
+    const lines = wdOut.split('\n').map((l) => l.trim());
+    const getVal = (key) => {
+      const line = lines.find((l) => l.toLowerCase().startsWith(`${key.toLowerCase()}:`));
+      return line ? line.split(':').slice(1).join(':').trim() : '';
+    };
+    const ssid = getVal('SSID');
+    if (ssid) {
+      return [{
+        name: ssid,
+        rssi: getVal('RSSI'),
+        noise: getVal('Noise'),
+        txRate: getVal('Tx Rate'),
+        channel: getVal('Channel'),
+        security: getVal('Security'),
+      }];
+    }
+  }
+
+  // Fallback: networksetup (SSID only, detect Wi‑Fi interface)
+  const hwOut = safeExec('networksetup -listallhardwareports');
+  let wifiDev = 'en0';
+  if (hwOut) {
+    const blocks = hwOut.split('\n\n');
+    for (const block of blocks) {
+      if (block.toLowerCase().includes('hardware port: wi-fi') || block.toLowerCase().includes('hardware port: airport')) {
+        const devLine = block.split('\n').find((l) => l.toLowerCase().startsWith('device:'));
+        if (devLine) {
+          wifiDev = devLine.split(':').slice(1).join(':').trim();
+          break;
+        }
+      }
+    }
+  }
+  const nsOut = safeExec(`networksetup -getairportnetwork ${wifiDev}`);
   if (nsOut && nsOut.includes(':')) {
     const ssid = nsOut.split(':').slice(1).join(':').trim();
     if (ssid) return [{ name: ssid }];
