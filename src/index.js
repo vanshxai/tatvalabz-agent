@@ -11,6 +11,7 @@ const PORT = Number(process.env.AGENT_PORT || 8787);
 const HOST = process.env.AGENT_HOST || '127.0.0.1';
 const AGENT_PAIR_SECRET = process.env.AGENT_PAIR_SECRET || '';
 const ALLOW_INSECURE_PAIR = process.env.ALLOW_INSECURE_PAIR === '1';
+const AGENT_API_TOKEN = process.env.AGENT_API_TOKEN || '';
 
 let config = await loadConfig();
 const heartbeat = createHeartbeatWorker({ getConfig: () => config });
@@ -60,6 +61,14 @@ function parseBody(req) {
     });
     req.on('error', reject);
   });
+}
+
+function isAuthValid(req) {
+  if (!AGENT_API_TOKEN) return true;
+  const auth = req.headers?.authorization || '';
+  if (!auth.startsWith('Bearer ')) return false;
+  const token = auth.slice('Bearer '.length).trim();
+  return token === AGENT_API_TOKEN;
 }
 
 function getStatus() {
@@ -198,6 +207,9 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (req.method === 'GET' && url.pathname === '/devices') {
+      if (!isAuthValid(req)) {
+        return safeJson(res, 401, { ok: false, error: 'Unauthorized' });
+      }
       return safeJson(res, 200, getDeviceSnapshot());
     }
 
