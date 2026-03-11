@@ -318,6 +318,22 @@ function listWifiDetails() {
     }
   }
 
+  // Last resort: infer Wi‑Fi is connected if en0 has IPs
+  const net = os.networkInterfaces();
+  const en0 = net?.en0 || [];
+  if (Array.isArray(en0) && en0.length > 0) {
+    const ipv4 = en0.find((n) => n.family === 'IPv4' && !n.internal)?.address;
+    const ipv6 = en0.find((n) => n.family === 'IPv6' && !n.internal)?.address;
+    if (ipv4 || ipv6) {
+      return [{
+        name: 'Wi‑Fi Connected (SSID unavailable)',
+        note: 'Run agent with sudo to see SSID and signal details.',
+        ipv4,
+        ipv6,
+      }];
+    }
+  }
+
   return [];
 }
 
