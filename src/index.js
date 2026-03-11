@@ -201,29 +201,59 @@ function parseSystemProfiler(section) {
 
 function listWifiDetails() {
   if (process.platform !== 'darwin') return [];
-  const items = parseSystemProfiler('SPAirPortDataType');
   const results = [];
+  const items = parseSystemProfiler('SPAirPortDataType');
   const walk = (nodes) => {
     if (!Array.isArray(nodes)) return;
     nodes.forEach((node) => {
-      if (node?._name && node?._name.toLowerCase().includes('airport')) {
-        const current = node?.spairport_current_network_information || {};
-        if (current?.spairport_network_name) {
-          results.push({
-            name: current.spairport_network_name,
-            rssi: current.spairport_signal_noise || current.spairport_signal_rssi,
-            noise: current.spairport_signal_noise,
-            txRate: current.spairport_transmit_rate,
-            channel: current.spairport_channel,
-            security: current.spairport_security_mode,
-          });
-        }
+      const current = node?.spairport_current_network_information;
+      if (current?.spairport_network_name) {
+        results.push({
+          name: current.spairport_network_name,
+          rssi: current.spairport_signal_noise || current.spairport_signal_rssi,
+          noise: current.spairport_signal_noise,
+          txRate: current.spairport_transmit_rate,
+          channel: current.spairport_channel,
+          security: current.spairport_security_mode,
+        });
       }
       if (Array.isArray(node?._items)) walk(node._items);
     });
   };
   walk(items);
-  return results;
+
+  if (results.length > 0) return results;
+
+  // Fallback: airport -I (more reliable across macOS versions)
+  const airportCmd = '/System/Library/PrivateFrameworks/Apple80211.framework/Versions/Current/Resources/airport -I';
+  const airportOut = safeExec(airportCmd);
+  if (airportOut) {
+    const lines = airportOut.split('\n').map((l) => l.trim());
+    const getVal = (key) => {
+      const line = lines.find((l) => l.startsWith(`${key}:`));
+      return line ? line.split(':').slice(1).join(':').trim() : '';
+    };
+    const ssid = getVal('SSID');
+    if (ssid) {
+      return [{
+        name: ssid,
+        rssi: getVal('agrCtlRSSI'),
+        noise: getVal('agrCtlNoise'),
+        txRate: getVal('lastTxRate'),
+        channel: getVal('channel'),
+        security: '',
+      }];
+    }
+  }
+
+  // Fallback: networksetup (SSID only)
+  const nsOut = safeExec('networksetup -getairportnetwork en0');
+  if (nsOut && nsOut.includes(':')) {
+    const ssid = nsOut.split(':').slice(1).join(':').trim();
+    if (ssid) return [{ name: ssid }];
+  }
+
+  return [];
 }
 
 function listPowerDetails() {
