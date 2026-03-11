@@ -189,7 +189,7 @@ function listUsbDevices() {
 }
 
 function parseSystemProfiler(section) {
-  const output = safeExec(`system_profiler ${section} -json`);
+  const output = safeExec(`/usr/sbin/system_profiler ${section} -json`);
   if (!output) return [];
   try {
     const payload = JSON.parse(output);
@@ -274,7 +274,7 @@ function listWifiDetails() {
   }
 
   // Fallback: wdutil info (newer macOS)
-  const wdOut = safeExec('wdutil info');
+  const wdOut = safeExec('/usr/bin/wdutil info');
   if (wdOut) {
     const lines = wdOut.split('\n').map((l) => l.trim());
     const getVal = (key) => {
@@ -295,7 +295,7 @@ function listWifiDetails() {
   }
 
   // Fallback: networksetup (SSID only, detect Wi‑Fi interface)
-  const hwOut = safeExec('networksetup -listallhardwareports');
+  const hwOut = safeExec('/usr/sbin/networksetup -listallhardwareports');
   let wifiDev = 'en0';
   if (hwOut) {
     const blocks = hwOut.split('\n\n');
@@ -309,10 +309,13 @@ function listWifiDetails() {
       }
     }
   }
-  const nsOut = safeExec(`networksetup -getairportnetwork ${wifiDev}`);
-  if (nsOut && nsOut.includes(':')) {
-    const ssid = nsOut.split(':').slice(1).join(':').trim();
-    if (ssid) return [{ name: ssid, note: 'Run agent with sudo to see signal details.' }];
+  const nsOut = safeExec(`/usr/sbin/networksetup -getairportnetwork ${wifiDev}`);
+  if (nsOut) {
+    const marker = 'Current Wi-Fi Network:';
+    if (nsOut.includes(marker)) {
+      const ssid = nsOut.split(marker).slice(1).join(marker).trim();
+      if (ssid) return [{ name: ssid, note: 'Run agent with sudo to see signal details.' }];
+    }
   }
 
   return [];
