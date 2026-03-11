@@ -188,6 +188,219 @@ function listUsbDevices() {
   return output.split('\n').filter(Boolean);
 }
 
+function parseSystemProfiler(section) {
+  const output = safeExec(`system_profiler ${section} -json`);
+  if (!output) return [];
+  try {
+    const payload = JSON.parse(output);
+    return payload?.[section] || [];
+  } catch {
+    return [];
+  }
+}
+
+function listWifiDetails() {
+  if (process.platform !== 'darwin') return [];
+  const items = parseSystemProfiler('SPAirPortDataType');
+  const results = [];
+  const walk = (nodes) => {
+    if (!Array.isArray(nodes)) return;
+    nodes.forEach((node) => {
+      if (node?._name && node?._name.toLowerCase().includes('airport')) {
+        const current = node?.spairport_current_network_information || {};
+        if (current?.spairport_network_name) {
+          results.push({
+            name: current.spairport_network_name,
+            rssi: current.spairport_signal_noise || current.spairport_signal_rssi,
+            noise: current.spairport_signal_noise,
+            txRate: current.spairport_transmit_rate,
+            channel: current.spairport_channel,
+            security: current.spairport_security_mode,
+          });
+        }
+      }
+      if (Array.isArray(node?._items)) walk(node._items);
+    });
+  };
+  walk(items);
+  return results;
+}
+
+function listPowerDetails() {
+  if (process.platform !== 'darwin') return [];
+  const items = parseSystemProfiler('SPPowerDataType');
+  const results = [];
+  const walk = (nodes) => {
+    if (!Array.isArray(nodes)) return;
+    nodes.forEach((node) => {
+      if (node?._name || node?.name) {
+        results.push({
+          name: node._name || node.name,
+          state: node?.spbattery_state || node?.charger_connected || node?.ac_charger_information,
+          charging: node?.spbattery_is_charging,
+          charge: node?.sppower_battery_charge || node?.battery_charge,
+          health: node?.sppower_battery_health,
+          wattage: node?.sppower_wattage,
+        });
+      }
+      if (Array.isArray(node?._items)) walk(node._items);
+    });
+  };
+  walk(items);
+  return results;
+}
+
+function listBluetoothDevices() {
+  if (process.platform !== 'darwin') return [];
+  const items = parseSystemProfiler('SPBluetoothDataType');
+  const results = [];
+  const walk = (nodes) => {
+    if (!Array.isArray(nodes)) return;
+    nodes.forEach((node) => {
+      if (node?._name && node?.device_connected !== undefined) {
+        results.push({
+          name: node._name,
+          address: node?.device_address,
+          connected: node?.device_connected,
+          type: node?.device_type,
+          manufacturer: node?.device_manufacturer,
+        });
+      }
+      if (Array.isArray(node?._items)) walk(node._items);
+    });
+  };
+  walk(items);
+  return results;
+}
+
+function listAudioDevices() {
+  if (process.platform !== 'darwin') return [];
+  const items = parseSystemProfiler('SPAudioDataType');
+  const results = [];
+  const walk = (nodes) => {
+    if (!Array.isArray(nodes)) return;
+    nodes.forEach((node) => {
+      if (node?._name) {
+        results.push({
+          name: node._name,
+          output: node?.coreaudio_device_output,
+          input: node?.coreaudio_device_input,
+          transport: node?.coreaudio_device_transport,
+        });
+      }
+      if (Array.isArray(node?._items)) walk(node._items);
+    });
+  };
+  walk(items);
+  return results;
+}
+
+function listDisplays() {
+  if (process.platform !== 'darwin') return [];
+  const items = parseSystemProfiler('SPDisplaysDataType');
+  const results = [];
+  const walk = (nodes) => {
+    if (!Array.isArray(nodes)) return;
+    nodes.forEach((node) => {
+      if (node?._name && node?.spdisplays_resolution) {
+        results.push({
+          name: node._name,
+          resolution: node?.spdisplays_resolution,
+          refresh: node?.spdisplays_refresh_rate,
+          connection: node?.spdisplays_connection_type,
+        });
+      }
+      if (Array.isArray(node?._items)) walk(node._items);
+    });
+  };
+  walk(items);
+  return results;
+}
+
+function listStorage() {
+  if (process.platform !== 'darwin') return [];
+  const items = parseSystemProfiler('SPStorageDataType');
+  const results = [];
+  const walk = (nodes) => {
+    if (!Array.isArray(nodes)) return;
+    nodes.forEach((node) => {
+      if (node?._name && node?.size) {
+        results.push({
+          name: node._name,
+          size: node?.size,
+          type: node?.type,
+          mount: node?.mount_point,
+        });
+      }
+      if (Array.isArray(node?._items)) walk(node._items);
+    });
+  };
+  walk(items);
+  return results;
+}
+
+function listCameras() {
+  if (process.platform !== 'darwin') return [];
+  const items = parseSystemProfiler('SPCameraDataType');
+  const results = [];
+  const walk = (nodes) => {
+    if (!Array.isArray(nodes)) return;
+    nodes.forEach((node) => {
+      if (node?._name) {
+        results.push({
+          name: node._name,
+          model: node?.model_id || node?.model,
+        });
+      }
+      if (Array.isArray(node?._items)) walk(node._items);
+    });
+  };
+  walk(items);
+  return results;
+}
+
+function listMidiDevices() {
+  if (process.platform !== 'darwin') return [];
+  const items = parseSystemProfiler('SPMIDIDataType');
+  const results = [];
+  const walk = (nodes) => {
+    if (!Array.isArray(nodes)) return;
+    nodes.forEach((node) => {
+      if (node?._name) {
+        results.push({
+          name: node._name,
+          manufacturer: node?.manufacturer,
+          transport: node?.transport,
+        });
+      }
+      if (Array.isArray(node?._items)) walk(node._items);
+    });
+  };
+  walk(items);
+  return results;
+}
+
+function listThunderbolt() {
+  if (process.platform !== 'darwin') return [];
+  const items = parseSystemProfiler('SPThunderboltDataType');
+  const results = [];
+  const walk = (nodes) => {
+    if (!Array.isArray(nodes)) return;
+    nodes.forEach((node) => {
+      if (node?._name) {
+        results.push({
+          name: node._name,
+          vendor: node?.vendor_name || node?.manufacturer,
+          device: node?.device_name,
+        });
+      }
+      if (Array.isArray(node?._items)) walk(node._items);
+    });
+  };
+  walk(items);
+  return results;
+}
+
 function listNetworkInterfaces() {
   const entries = os.networkInterfaces();
   const result = [];
@@ -218,6 +431,15 @@ function getDeviceSnapshot() {
     usb: usbFlat,
     usbDetails: Array.isArray(usbDetails) ? null : usbDetails,
     network: listNetworkInterfaces(),
+    wifi: listWifiDetails(),
+    power: listPowerDetails(),
+    bluetooth: listBluetoothDevices(),
+    audio: listAudioDevices(),
+    displays: listDisplays(),
+    storage: listStorage(),
+    cameras: listCameras(),
+    midi: listMidiDevices(),
+    thunderbolt: listThunderbolt(),
   };
 }
 
