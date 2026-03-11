@@ -246,6 +246,33 @@ function listWifiDetails() {
     }
   }
 
+  // Fallback: wdutil info when running as root (sudo)
+  try {
+    if (typeof process.getuid === 'function' && process.getuid() === 0) {
+      const wdOut = safeExec('wdutil info');
+      if (wdOut) {
+        const lines = wdOut.split('\n').map((l) => l.trim());
+        const getVal = (key) => {
+          const line = lines.find((l) => l.toLowerCase().startsWith(`${key.toLowerCase()}:`));
+          return line ? line.split(':').slice(1).join(':').trim() : '';
+        };
+        const ssid = getVal('SSID');
+        if (ssid) {
+          return [{
+            name: ssid,
+            rssi: getVal('RSSI'),
+            noise: getVal('Noise'),
+            txRate: getVal('Tx Rate'),
+            channel: getVal('Channel'),
+            security: getVal('Security'),
+          }];
+        }
+      }
+    }
+  } catch {
+    // ignore
+  }
+
   // Fallback: wdutil info (newer macOS)
   const wdOut = safeExec('wdutil info');
   if (wdOut) {
@@ -285,7 +312,7 @@ function listWifiDetails() {
   const nsOut = safeExec(`networksetup -getairportnetwork ${wifiDev}`);
   if (nsOut && nsOut.includes(':')) {
     const ssid = nsOut.split(':').slice(1).join(':').trim();
-    if (ssid) return [{ name: ssid }];
+    if (ssid) return [{ name: ssid, note: 'Run agent with sudo to see signal details.' }];
   }
 
   return [];
